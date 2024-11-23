@@ -8,6 +8,10 @@
 (define-constant ERROR-INVALID-DOCUMENT-STATUS (err u103))
 (define-constant ERROR-DOCUMENT-ALREADY-VERIFIED (err u104))
 
+;; Constants for verification status
+(define-constant STATUS-PENDING "PENDING")
+(define-constant STATUS-VERIFIED "VERIFIED")
+
 ;; Data maps
 (define-map document-records
     { document-hash-id: (buff 32) }
@@ -15,7 +19,7 @@
         document-owner: principal,
         document-content-hash: (buff 32),
         submission-timestamp: uint,
-        verification-status: (string-utf8 20),
+        verification-status: (string-ascii 20),
         verification-authority: (optional principal),
         document-metadata: (string-utf8 256),
         document-version: uint,
@@ -31,9 +35,8 @@
 ;; Read-only functions
 (define-read-only (get-document-details (document-hash-id (buff 32)))
     (match (map-get? document-records { document-hash-id: document-hash-id })
-        document-record document-record
-        (err ERROR-DOCUMENT-MISSING)
-    )
+        found-doc (ok found-doc)
+        (err ERROR-DOCUMENT-MISSING))
 )
 
 (define-read-only (get-user-permissions (document-hash-id (buff 32)) (authorized-user principal))
@@ -47,9 +50,8 @@
     (document-hash-id (buff 32))
     (provided-hash (buff 32)))
     (match (map-get? document-records { document-hash-id: document-hash-id })
-        document-record (ok (is-eq (get document-content-hash document-record) provided-hash))
-        (err ERROR-DOCUMENT-MISSING)
-    )
+        found-doc (ok (is-eq (get document-content-hash found-doc) provided-hash))
+        (err ERROR-DOCUMENT-MISSING))
 )
 
 ;; Public functions
@@ -67,7 +69,7 @@
                 document-owner: document-submitter,
                 document-content-hash: document-content-hash,
                 submission-timestamp: block-height,
-                verification-status: "PENDING",
+                verification-status: STATUS-PENDING,
                 verification-authority: none,
                 document-metadata: document-metadata,
                 document-version: u1,
@@ -117,7 +119,7 @@
             { document-hash-id: document-hash-id }
             (merge existing-document
                 {
-                    verification-status: "VERIFIED",
+                    verification-status: STATUS-VERIFIED,
                     verification-authority: (some verifying-authority),
                     verification-complete: true
                 }
